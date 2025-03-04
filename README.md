@@ -1,6 +1,3 @@
-Below is an updated README that explains the entire setup—from installing the necessary npm packages, running the Docker containers for Grafana and Loki, and running multiple clients that auto‑register their external IP (on port 8000) into the Prometheus configuration.
-
----
 
 # Node.js Express Metrics with Auto‑Registered Prometheus Targets
 
