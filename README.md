@@ -19,13 +19,12 @@ This repository demonstrates a Node.js Express application that exposes Promethe
   When a client starts, it:
   - Detects its external IP.
   - Constructs a target string as `externalIP:8000`.
-  - Updates a shared `prometheus.yml` file (with an initially empty target list) to add its target.
+  - Updates a shared `prometheus-config.yml` file (with an initially empty target list) to add its target.
   - Optionally triggers a reload of Prometheus so the new target is scraped immediately.
 
 - **Grafana Dashboard:**  
   With Prometheus as the data source, the instance label is used to filter metrics. Grafana’s instance dropdown will list each client’s IP, allowing you to view individual systems or aggregated metrics.
 
----
 
 ## Prerequisites
 
@@ -49,9 +48,9 @@ npm install js-yaml
 ## File Structure
 
 - **index.js** – The main Express server file with Prometheus metrics, Loki logging, and auto‑registration logic.
-- **prometheus.yml** – The Prometheus configuration file with an initially empty target list.
+- **prometheus-config.yml** – The Prometheus configuration file with an initially empty target list.
 - **util.js** – Utility functions (e.g. simulating a heavy task).
-- (Optional) Docker Compose files for orchestrating Prometheus, Grafana, and Loki.
+- **docker-compose.yml**
 
 ---
 
@@ -59,7 +58,7 @@ npm install js-yaml
 
 ### 1. Prometheus Configuration
 
-Create a `prometheus.yml` file in the same directory as `index.js` with the following content:
+Create a `prometheus-config.yml` file in the same directory as `index.js` with the following content:
 
 ```yaml
 global:
@@ -81,62 +80,68 @@ scrape_configs:
 Start Grafana and Loki using the following commands:
 
 ```bash
-docker run -d --name=loki -p 3100:3100 grafana/loki
 docker run -d -p 3000:3000 --name=grafana grafana/grafana-oss
 ```
-
+```bash
+docker run -d --name=loki -p 3100:3100 grafana/loki
+```
 > **Note:**  
-> Ensure that the directory containing `prometheus.yml` is mounted into the Prometheus container (if you are running Prometheus via Docker Compose) so that all clients update the same file.
+> Ensure that the directory containing `prometheus-config.yml` is mounted into the Prometheus container (if you are running Prometheus via Docker Compose) so that all clients update the same file.
 
----
 
 ## Running the Application
 
-Each client will update the shared Prometheus configuration with its external IP (using port 8000). Instruct your clients to set up Grafana and Loki as described above, then run the Node.js app.
+On each client machine, open a terminal and perform the following steps:
 
-### On Unix/Linux/macOS
+1. **Install Dependencies (if not done yet):**
 
-Open separate terminal windows for each client and run:
+   ```bash
+   npm install
+   npm install winston winston-loki
+   npm install prom-client
+   npm install js-yaml
+   ```
 
-- **Client 1:**
-  ```bash
-  CLIENT_ID=client1 PORT=8000 node index.js
-  ```
+2. **Run Docker Compose for Prometheus (or start Prometheus directly):**
 
-- **Client 2:**
-  ```bash
-  CLIENT_ID=client2 PORT=8000 node index.js
-  ```
+   If using Docker Compose, run in your project directory:
+   
+   ```bash
+   docker compose up
+   ```
 
-- **Client 3:**
-  ```bash
-  CLIENT_ID=client3 PORT=8000 node index.js
-  ```
+   *(Ensure your Docker Compose file mounts the directory containing `prometheus-config.yml` so that updates by Node.js are visible.)*
 
-### On Windows
+3. **Run the Node.js Application:**
 
-**Command Prompt:**
-```cmd
-set CLIENT_ID=client1
-set PORT=8000
-node index.js
-```
-Repeat in separate windows for each client.
+   In a separate terminal on each client machine, run:
 
-**PowerShell:**
-```powershell
-$env:CLIENT_ID="client1"; $env:PORT="8000"; node index.js
-```
-Repeat for each client with different `CLIENT_ID` values.
+   - **On Unix/Linux/macOS:**
+     ```bash
+     node index.js
+     ```
+     *(Since the code auto‑detects the external IP and always uses port 8000, you don’t need to specify environment variables manually unless you want to override the default.)*
 
----
+   - **On Windows (Command Prompt):**
+     ```cmd
+     node index.js
+     ```
+     
+     *(Or in PowerShell, simply run `node index.js`.)*
+
+Each client will:
+- Bind the Express server to all interfaces (0.0.0.0) on port 8000.
+- Detect its external IP (e.g. `192.168.x.x`) and form a target (`192.168.x.x:8000`).
+- Automatically update the shared `prometheus-config.yml` by adding its target.
+- Optionally trigger Prometheus to reload its configuration.
+
 
 ## How It Works
 
 1. **Auto‑Registration:**
    - On startup, the Node.js app determines its external IP using the host’s network interfaces.
    - It constructs a target string like `192.168.x.x:8000`.
-   - The app then reads the shared `prometheus.yml` file, locates the target list for the "prometheus" job, and adds its target if it isn’t already present.
+   - The app then reads the shared `prometheus-config.yml` file, locates the target list for the "prometheus" job, and adds its target if it isn’t already present.
    - Finally, it sends a reload request to Prometheus (assumed to be running on `localhost:9090`) so the new target is immediately scraped.
 
 2. **Prometheus and Grafana:**
@@ -151,7 +156,7 @@ Repeat for each client with different `CLIENT_ID` values.
   - Verify that the `CLIENT_ID` and `PORT` environment variables are set correctly (print them at the start of `index.js` if needed).
 
 - **File Write Permissions:**
-  - Ensure that the Node.js process has read/write permissions for `prometheus.yml` (especially important when running inside Docker).
+  - Ensure that the Node.js process has read/write permissions for `prometheus-config.yml` (especially important when running inside Docker).
 
 - **Prometheus Reload:**
   - The code sends a POST request to `http://localhost:9090/-/reload`. If your Prometheus instance is running elsewhere, update this URL accordingly.
