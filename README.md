@@ -3,7 +3,6 @@
 
 This repository demonstrates a Node.js Express application that exposes Prometheus metrics and sends logs via Loki. Each client running this app automatically detects its external IP and updates a shared Prometheus configuration file so that its target (`externalIP:8000`) is added. This allows Grafana to display metrics from all clients—each client’s IP will appear in the Grafana instance dropdown (with an “All” option available).
 
----
 
 ## Features
 
